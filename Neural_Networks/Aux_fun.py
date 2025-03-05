@@ -4,17 +4,14 @@ import numpy as np
 from sklearn.metrics import r2_score
 from sklearn.linear_model import LinearRegression
 import seaborn as sns
-import os
+
 
 def db_read(mat_type, sym):
-    current_file_path = os.path.abspath(__file__)
-    basepath = os.path.dirname(os.path.dirname(current_file_path))
-    data_path = os.path.join(basepath, 'data\\')
     df = pd.DataFrame()
-    df1 = pd.read_csv(data_path + mat_type + '/B_waveform[T].csv')
-    df['f'] = pd.read_csv(data_path + mat_type + '/Frequency[Hz].csv')
-    df['T'] = pd.read_csv(data_path + mat_type + '/Temperature[C].csv')
-    df['P'] = pd.read_csv(data_path + mat_type + '/Volumetric_losses[Wm-3].csv')
+    df1 = pd.read_csv('C:\\Users\\Cadema\\PycharmProjects\\Mag_Net_pvt\\data/' + mat_type + '/B_waveform[T].csv')
+    df['f'] = pd.read_csv('C:\\Users\\Cadema\\PycharmProjects\\Mag_Net_pvt\\data/' + mat_type + '/Frequency[Hz].csv')
+    df['T'] = pd.read_csv('C:\\Users\\Cadema\\PycharmProjects\\Mag_Net_pvt\\data/' + mat_type + '/Temperature[C].csv')
+    df['P'] = pd.read_csv('C:\\Users\\Cadema\\PycharmProjects\\Mag_Net_pvt\\data/' + mat_type + '/Volumetric_losses[Wm-3].csv')
     df['W'] = df['P'] / df['f']
 
 
@@ -68,89 +65,6 @@ def db_read(mat_type, sym):
     aux_sin.reset_index(drop=True, inplace=True)
     aux_tri.reset_index(drop=True, inplace=True)
     return aux_sin, aux_tri
-
-def db_read_trapz(mat_type):
-    current_file_path = os.path.abspath(__file__)
-    basepath = os.path.dirname(current_file_path)
-    data_path = os.path.join(basepath, 'data\\')
-    df = pd.DataFrame()
-    df1 = pd.read_csv(data_path + mat_type + '\\B_waveform[T].csv')
-    df['f'] = pd.read_csv(data_path + mat_type + '\\Frequency[Hz].csv')
-    df['T'] = pd.read_csv(data_path + mat_type + '\\Temperature[C].csv')
-    df['P'] = pd.read_csv(data_path + mat_type + '\\Volumetric_losses[Wm-3].csv')
-    df['W'] = df['P'] / df['f']
-
-
-    # Calcola il valore picco-picco su ciascuna riga
-    peak_to_peak = np.ptp(df1, axis=1)
-    # Calcola il valore efficace su ciascuna riga
-    rms = np.sqrt(np.mean(df1 ** 2, axis=1))
-    arv = np.mean(abs(df1), axis=1)
-    fdc = peak_to_peak / 2 / rms
-    fdf = rms / arv
-
-    df['pk_pk'] = 1e3 * peak_to_peak
-    df['rms'] = 1e3 * rms
-    df['fdc'] = fdc
-    df['fdf'] = fdf
-
-    df['wave'] = 'trapz'
-    # Condizione per selezionare le righe
-    condizione_tri = (np.isclose(df['fdf'], 2 / (3 ** 0.5), rtol=0.05)) & (np.isclose(df['fdc'], 3 ** 0.5, rtol=0.05))
-    condizione_sin = (np.isclose(df['fdf'], np.pi / (2 * 2 ** 0.5), rtol=0.006)) & (
-        np.isclose(df['fdc'], 2 ** 0.5, rtol=0.006))
-    # Assegna 'tri' alle righe che soddisfano la condizione
-    df.loc[condizione_tri, 'wave'] = 'tri'
-    df.loc[condizione_sin, 'wave'] = 'sin'
-
-    indici = set(df.index)
-    # Ottieni gli indici delle righe che soddisfano la condizione
-    indici_righe_tri = df.index[condizione_tri].tolist()
-    # Ottieni gli indici delle righe che soddisfano la condizione
-    indici_righe_sin = df.index[condizione_sin].tolist()
-    indici_righe_trapz = indici - set(indici_righe_tri) - set(indici_righe_sin)
-    indici_righe_trapz = list(indici_righe_trapz)
-    df['W'] = 1e3 * df['W']
-
-    df_sin = df[df['wave'] == 'sin'].copy()
-    # df_sin[['f', 'P', 'W', 'pk_pk']] = np.log10(df_sin[['f', 'P', 'W', 'pk_pk']])
-
-    df_tri = df[df['wave'] == 'tri'].copy()
-    # df_tri[['f', 'P', 'W', 'pk_pk']] = np.log10(df_tri[['f', 'P', 'W', 'pk_pk']])
-
-    df_trapz = df[df['wave'] == 'trapz'].copy()
-
-    dB_wf_tri = np.diff(df1.loc[indici_righe_tri, :])
-    duty = (np.count_nonzero(dB_wf_tri > 0, axis=1) / len(dB_wf_tri[0]))
-    df_tri['duty'] = duty
-
-    # aux_sin = df_sin.loc[df_sin['T']==25]
-    # aux_tri = df_tri.loc[(df_tri['T']==25) & (np.isclose(df_tri['duty'],0.5,atol = 0.003))]
-
-    aux_sin = df_sin.copy()
-    aux_tri = df_tri.copy()
-    aux_trapz = df_trapz.copy()
-    aux_sin.reset_index(drop=True, inplace=True)
-    aux_tri.reset_index(drop=True, inplace=True)
-    aux_trapz.reset_index(drop=True, inplace=True)
-
-    df_wf_trapz = (df1.loc[indici_righe_trapz, :]).to_numpy()
-
-    # # Calcola il valore picco-picco su ciascuna riga
-    # peak_to_peak = np.ptp(df_wf_trapz, axis=1)
-    # # Calcola il valore efficace su ciascuna riga
-    # rms = np.sqrt(np.mean(df_wf_trapz ** 2, axis=1))
-    # arv = np.mean(abs(df_wf_trapz), axis=1)
-    # fdc = peak_to_peak / 2 / rms
-    # fdf = rms / arv
-    #
-    # df_check=pd.DataFrame()
-    # df_check['pk_pk'] = 1e3 * peak_to_peak
-    # df_check['rms'] = 1e3 * rms
-    # df_check['fdc'] = fdc
-    # df_check['fdf'] = fdf
-
-    return aux_trapz, df_wf_trapz
 
 
 def reg_plot(y_true, predictions, type):
@@ -328,6 +242,3 @@ def rapporto_sin_tri(aux_sin, aux_tri, plot):
         # plt.grid(True)
         # plt.show()
     return aux_sin, aux_tri
-
-if __name__ == "__main__":
-    ciccio,pippo = db_read_trapz('N87_val')
